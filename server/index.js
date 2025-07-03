@@ -6,6 +6,7 @@ import sqlite3 from "sqlite3";
 import dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { initializeJobs, runJob } from "./jobs/scheduler.js";
 
 dotenv.config();
 
@@ -792,6 +793,77 @@ app.get(
   }
 );
 
+// Job management routes
+app.get("/api/admin/jobs", authenticateToken, requireAdmin, (req, res) => {
+  db.all(
+    `SELECT * FROM job_logs ORDER BY executed_at DESC LIMIT 50`,
+    (err, logs) => {
+      if (err) {
+        return res.status(500).json({ error: "Database error" });
+      }
+      res.json(logs);
+    }
+  );
+});
+
+app.post(
+  "/api/admin/jobs/:jobName/run",
+  authenticateToken,
+  requireAdmin,
+  async (req, res) => {
+    const { jobName } = req.params;
+
+    try {
+      await runJob(jobName);
+      res.json({ message: `Job ${jobName} executed successfully` });
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+);
+
+// User preferences routes
+app.get("/api/user/preferences", authenticateToken, (req, res) => {
+  const userId = req.user.id;
+
+  db.get(
+    `SELECT * FROM user_preferences WHERE user_id = ?`,
+    [userId],
+    (err, preferences) => {
+      if (err) {
+        return res.status(500).json({ error: "Database error" });
+      }
+
+      // Return default preferences if none exist
+      const defaultPreferences = {
+        email_reminders: true,
+        reminder_time: "09:00",
+        weekly_reports: true,
+      };
+
+      res.json(preferences || defaultPreferences);
+    }
+  );
+});
+
+app.put("/api/user/preferences", authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  const { email_reminders, reminder_time, weekly_reports } = req.body;
+
+  db.run(
+    `INSERT OR REPLACE INTO user_preferences 
+          (user_id, email_reminders, reminder_time, weekly_reports) 
+          VALUES (?, ?, ?, ?)`,
+    [userId, email_reminders, reminder_time, weekly_reports],
+    function (err) {
+      if (err) {
+        return res.status(500).json({ error: "Database error" });
+      }
+      res.json({ message: "Preferences updated successfully" });
+    }
+  );
+});
+
 // User routes
 app.get("/api/user/attempts", authenticateToken, (req, res) => {
   const userId = req.user.id;
@@ -812,6 +884,16 @@ app.get("/api/user/attempts", authenticateToken, (req, res) => {
   );
 });
 
+// Initialize job scheduler
+if (process.env.ENABLE_JOBS !== "false") {
+  initializeJobs();
+}
+
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(
+    `📧 Job system ${
+      process.env.ENABLE_JOBS !== "false" ? "enabled" : "disabled"
+    }`
+  );
 });
