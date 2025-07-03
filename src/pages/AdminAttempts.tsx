@@ -1,46 +1,50 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import api from "../utils/api";
-import {
-  Trophy,
-  Clock,
-  Target,
-  Calendar,
-  TrendingUp,
-  BarChart3,
-  Download,
-} from "lucide-react";
-import { UserProgressChart } from "../components/Charts";
-import { generateUserReport } from "../utils/pdfExport";
-import { useAuth } from "../contexts/AuthContext";
+import { ArrowLeft, Trophy, Clock, User, Calendar, Target } from "lucide-react";
 import SearchFilters from "../components/SearchFilters";
 import { useSearch } from "../hooks/useSearch";
 
-interface Attempt {
+interface AttemptData {
   id: number;
+  username: string;
   quiz_title: string;
+  category: string;
+  difficulty: string;
   score: number;
   total_questions: number;
   time_taken: number;
   completed_at: string;
+  user_id: number;
 }
 
-const UserHistory = () => {
-  const { user } = useAuth();
-  const [attempts, setAttempts] = useState<Attempt[]>([]);
+interface UserData {
+  id: number;
+  username: string;
+  email: string;
+}
+
+const AdminAttempts = () => {
+  const [attempts, setAttempts] = useState<AttemptData[]>([]);
+  const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [exportLoading, setExportLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetchAttempts();
+    fetchData();
   }, []);
 
-  const fetchAttempts = async () => {
+  const fetchData = async () => {
     try {
-      const response = await api.get("/user/attempts");
-      setAttempts(response.data);
+      const [attemptsResponse, usersResponse] = await Promise.all([
+        api.get("/admin/attempts"),
+        api.get("/admin/users"),
+      ]);
+
+      setAttempts(attemptsResponse.data);
+      setUsers(usersResponse.data);
     } catch (err) {
-      setError("Failed to fetch quiz history");
+      setError("Failed to fetch attempts data");
     } finally {
       setLoading(false);
     }
@@ -54,7 +58,7 @@ const UserHistory = () => {
     hasActiveFilters,
   } = useSearch({
     data: attempts,
-    searchFields: ["quiz_title"],
+    searchFields: ["username", "quiz_title", "category"],
     defaultSort: { field: "completed_at", order: "desc" },
   });
 
@@ -71,65 +75,18 @@ const UserHistory = () => {
     return "text-red-600";
   };
 
-  const calculateStats = () => {
-    if (attempts.length === 0)
-      return { avgScore: 0, totalQuizzes: 0, bestScore: 0, totalTimeSpent: 0 };
-
-    const totalScore = attempts.reduce(
-      (sum, attempt) => sum + attempt.score,
-      0
-    );
-    const totalQuestions = attempts.reduce(
-      (sum, attempt) => sum + attempt.total_questions,
-      0
-    );
-    const avgScore =
-      totalQuestions > 0 ? Math.round((totalScore / totalQuestions) * 100) : 0;
-    const bestScore = Math.max(
-      ...attempts.map((a) => Math.round((a.score / a.total_questions) * 100))
-    );
-    const totalTimeSpent = attempts.reduce(
-      (sum, attempt) => sum + attempt.time_taken,
-      0
-    );
-
-    return {
-      avgScore,
-      totalQuizzes: attempts.length,
-      bestScore,
-      totalTimeSpent,
-    };
-  };
-
-  const getProgressData = () => {
-    return attempts
-      .slice()
-      .reverse()
-      .slice(-10)
-      .map((attempt) => ({
-        date: attempt.completed_at,
-        score: Math.round((attempt.score / attempt.total_questions) * 100),
-        quiz: attempt.quiz_title,
-      }));
-  };
-
-  const handleExportPDF = async () => {
-    if (!user) return;
-
-    setExportLoading(true);
-    try {
-      const stats = calculateStats();
-      await generateUserReport(user.username, attempts, stats);
-    } catch (error) {
-      console.error("Failed to generate PDF:", error);
-      setError("Failed to generate PDF report");
-    } finally {
-      setExportLoading(false);
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty.toLowerCase()) {
+      case "beginner":
+        return "bg-green-100 text-green-800";
+      case "intermediate":
+        return "bg-yellow-100 text-yellow-800";
+      case "advanced":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
-
-  const stats = calculateStats();
-  const progressData = getProgressData();
 
   if (loading) {
     return (
@@ -141,27 +98,20 @@ const UserHistory = () => {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div className="text-center flex-1">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Your Quiz History
-          </h1>
+      <div className="flex items-center space-x-4">
+        <Link
+          to="/admin"
+          className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+        >
+          <ArrowLeft className="h-5 w-5" />
+          <span>Back to Dashboard</span>
+        </Link>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Quiz Attempts</h1>
           <p className="text-lg text-gray-600">
-            Track your progress and performance
+            Monitor all user quiz attempts and performance
           </p>
         </div>
-        <button
-          onClick={handleExportPDF}
-          disabled={exportLoading || attempts.length === 0}
-          className="flex items-center space-x-2 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:from-green-700 hover:to-green-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {exportLoading ? (
-            <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-          ) : (
-            <Download className="h-5 w-5" />
-          )}
-          <span>Export PDF</span>
-        </button>
       </div>
 
       {error && (
@@ -170,62 +120,16 @@ const UserHistory = () => {
         </div>
       )}
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl p-6 border border-white/20">
-          <div className="flex items-center space-x-3 mb-2">
-            <Trophy className="h-6 w-6 text-yellow-600" />
-            <span className="text-sm font-medium text-gray-600">
-              Total Quizzes
-            </span>
-          </div>
-          <p className="text-3xl font-bold text-gray-900">
-            {stats.totalQuizzes}
-          </p>
-        </div>
-
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl p-6 border border-white/20">
-          <div className="flex items-center space-x-3 mb-2">
-            <Target className="h-6 w-6 text-blue-600" />
-            <span className="text-sm font-medium text-gray-600">
-              Average Score
-            </span>
-          </div>
-          <p className="text-3xl font-bold text-gray-900">{stats.avgScore}%</p>
-        </div>
-
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl p-6 border border-white/20">
-          <div className="flex items-center space-x-3 mb-2">
-            <TrendingUp className="h-6 w-6 text-green-600" />
-            <span className="text-sm font-medium text-gray-600">
-              Best Score
-            </span>
-          </div>
-          <p className="text-3xl font-bold text-gray-900">{stats.bestScore}%</p>
-        </div>
-      </div>
-
-      {/* Progress Chart */}
-      {progressData.length > 0 && (
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl p-6 border border-white/20">
-          <div className="flex items-center space-x-2 mb-4">
-            <BarChart3 className="h-5 w-5 text-green-600" />
-            <h3 className="text-lg font-semibold text-gray-900">
-              Your Progress Over Time
-            </h3>
-          </div>
-          <UserProgressChart data={progressData} />
-        </div>
-      )}
-
       {/* Search and Filters */}
       <SearchFilters
         onSearch={handleSearch}
         onFilter={handleFilter}
         onSort={handleSort}
-        searchPlaceholder="Search your quiz attempts by quiz name..."
+        searchPlaceholder="Search by username, quiz title, or category..."
+        showUserFilter={true}
         showDateFilter={true}
         showScoreFilter={true}
+        users={users}
       />
 
       {/* Results Summary */}
@@ -237,10 +141,12 @@ const UserHistory = () => {
         </div>
       )}
 
-      {/* Quiz History */}
+      {/* Attempts List */}
       <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-white/20">
         <div className="p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Quiz Attempts</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            All Quiz Attempts
+          </h2>
         </div>
 
         {filteredAttempts.length === 0 ? (
@@ -249,12 +155,12 @@ const UserHistory = () => {
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
               {hasActiveFilters
                 ? "No attempts match your search"
-                : "No quiz attempts yet"}
+                : "No quiz attempts found"}
             </h3>
             <p className="text-gray-600">
               {hasActiveFilters
                 ? "Try adjusting your search criteria or filters"
-                : "Start taking quizzes to see your history here!"}
+                : "Quiz attempts will appear here once users start taking quizzes."}
             </p>
           </div>
         ) : (
@@ -264,19 +170,53 @@ const UserHistory = () => {
                 key={attempt.id}
                 className="p-6 hover:bg-gray-50 transition-colors"
               >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {attempt.quiz_title}
-                  </h3>
-                  <div className="flex items-center space-x-2 text-sm text-gray-500">
-                    <Calendar className="h-4 w-4" />
-                    <span>
-                      {new Date(attempt.completed_at).toLocaleDateString()}
-                    </span>
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                      <span className="text-white font-semibold">
+                        {attempt.username.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {attempt.quiz_title}
+                      </h3>
+                      <div className="flex items-center space-x-3 mt-1">
+                        <div className="flex items-center space-x-1">
+                          <User className="h-4 w-4 text-gray-500" />
+                          <span className="text-sm text-gray-600">
+                            {attempt.username}
+                          </span>
+                        </div>
+                        <span className="text-gray-400">•</span>
+                        <span className="text-sm text-gray-600">
+                          {attempt.category}
+                        </span>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(
+                            attempt.difficulty
+                          )}`}
+                        >
+                          {attempt.difficulty}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="flex items-center space-x-2 text-sm text-gray-500 mb-1">
+                      <Calendar className="h-4 w-4" />
+                      <span>
+                        {new Date(attempt.completed_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {new Date(attempt.completed_at).toLocaleTimeString()}
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                   <div className="flex items-center space-x-2">
                     <Trophy className="h-4 w-4 text-yellow-600" />
                     <span className="text-sm text-gray-600">Score:</span>
@@ -312,6 +252,24 @@ const UserHistory = () => {
                     <span className="font-semibold text-gray-900">
                       {formatTime(attempt.time_taken)}
                     </span>
+                  </div>
+
+                  <div className="flex items-center justify-end">
+                    <div
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        attempt.score / attempt.total_questions >= 0.8
+                          ? "bg-green-100 text-green-800"
+                          : attempt.score / attempt.total_questions >= 0.6
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {attempt.score / attempt.total_questions >= 0.8
+                        ? "Excellent"
+                        : attempt.score / attempt.total_questions >= 0.6
+                        ? "Good"
+                        : "Needs Improvement"}
+                    </div>
                   </div>
                 </div>
 
@@ -352,4 +310,4 @@ const UserHistory = () => {
   );
 };
 
-export default UserHistory;
+export default AdminAttempts;

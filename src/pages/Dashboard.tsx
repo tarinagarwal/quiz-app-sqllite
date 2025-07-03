@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import api from '../utils/api';
-import { BookOpen, Clock, Users, Trophy, Play, Star } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import api from "../utils/api";
+import { BookOpen, Clock, Users, Trophy, Play, Star } from "lucide-react";
+import SearchFilters from "../components/SearchFilters";
+import { useSearch } from "../hooks/useSearch";
 
 interface Quiz {
   id: number;
@@ -13,13 +15,14 @@ interface Quiz {
   time_limit: number;
   created_by_name: string;
   attempts_count: number;
+  created_at: string;
 }
 
 const Dashboard = () => {
   const { user } = useAuth();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   useEffect(() => {
     fetchQuizzes();
@@ -27,25 +30,39 @@ const Dashboard = () => {
 
   const fetchQuizzes = async () => {
     try {
-      const response = await api.get('/quizzes');
+      const response = await api.get("/quizzes");
       setQuizzes(response.data);
     } catch (err) {
-      setError('Failed to fetch quizzes');
+      setError("Failed to fetch quizzes");
     } finally {
       setLoading(false);
     }
   };
 
+  const {
+    filteredData: filteredQuizzes,
+    handleSearch,
+    handleFilter,
+    handleSort,
+    hasActiveFilters,
+  } = useSearch({
+    data: quizzes,
+    searchFields: ["title", "description", "category", "created_by_name"],
+    defaultSort: { field: "created_at", order: "desc" },
+  });
+
+  const categories = [...new Set(quizzes.map((quiz) => quiz.category))];
+
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty.toLowerCase()) {
-      case 'easy':
-        return 'bg-green-100 text-green-800';
-      case 'medium':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'hard':
-        return 'bg-red-100 text-red-800';
+      case "beginner":
+        return "bg-green-100 text-green-800";
+      case "intermediate":
+        return "bg-yellow-100 text-yellow-800";
+      case "advanced":
+        return "bg-red-100 text-red-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -74,8 +91,29 @@ const Dashboard = () => {
         </div>
       )}
 
+      {/* Search and Filters */}
+      <SearchFilters
+        onSearch={handleSearch}
+        onFilter={handleFilter}
+        onSort={handleSort}
+        searchPlaceholder="Search quizzes by title, description, category, or creator..."
+        showCategoryFilter={true}
+        showDifficultyFilter={true}
+        categories={categories}
+      />
+
+      {/* Results Summary */}
+      {hasActiveFilters && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-blue-700">
+            Showing {filteredQuizzes.length} of {quizzes.length} quizzes
+          </p>
+        </div>
+      )}
+
+      {/* Quiz Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {quizzes.map((quiz) => (
+        {filteredQuizzes.map((quiz) => (
           <div
             key={quiz.id}
             className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl p-6 border border-white/20 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
@@ -83,15 +121,25 @@ const Dashboard = () => {
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center space-x-2">
                 <BookOpen className="h-6 w-6 text-blue-600" />
-                <span className="text-sm font-medium text-gray-600">{quiz.category}</span>
+                <span className="text-sm font-medium text-gray-600">
+                  {quiz.category}
+                </span>
               </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-medium ${getDifficultyColor(quiz.difficulty)}`}>
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-medium ${getDifficultyColor(
+                  quiz.difficulty
+                )}`}
+              >
                 {quiz.difficulty}
               </span>
             </div>
 
-            <h3 className="text-xl font-bold text-gray-900 mb-2">{quiz.title}</h3>
-            <p className="text-gray-600 mb-4 line-clamp-3">{quiz.description}</p>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">
+              {quiz.title}
+            </h3>
+            <p className="text-gray-600 mb-4 line-clamp-3">
+              {quiz.description}
+            </p>
 
             <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
               <div className="flex items-center space-x-1">
@@ -121,11 +169,19 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {quizzes.length === 0 && !loading && (
+      {filteredQuizzes.length === 0 && !loading && (
         <div className="text-center py-12">
           <BookOpen className="h-24 w-24 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No quizzes available</h3>
-          <p className="text-gray-600">Check back later for new quizzes!</p>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            {hasActiveFilters
+              ? "No quizzes match your search"
+              : "No quizzes available"}
+          </h3>
+          <p className="text-gray-600">
+            {hasActiveFilters
+              ? "Try adjusting your search criteria or filters"
+              : "Check back later for new quizzes!"}
+          </p>
         </div>
       )}
     </div>

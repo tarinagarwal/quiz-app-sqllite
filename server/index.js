@@ -689,6 +689,87 @@ app.get(
   }
 );
 
+// Enhanced admin route for searching quiz attempts
+app.get("/api/admin/attempts", authenticateToken, requireAdmin, (req, res) => {
+  const {
+    search,
+    userId,
+    startDate,
+    endDate,
+    minScore,
+    maxScore,
+    sortBy = "completed_at",
+    sortOrder = "desc",
+  } = req.query;
+
+  let query = `
+    SELECT qa.*, u.username, q.title as quiz_title, q.category, q.difficulty
+    FROM quiz_attempts qa
+    JOIN users u ON qa.user_id = u.id
+    JOIN quizzes q ON qa.quiz_id = q.id
+    WHERE 1=1
+  `;
+
+  const params = [];
+
+  // Add search filter
+  if (search) {
+    query += ` AND (u.username LIKE ? OR q.title LIKE ? OR q.category LIKE ?)`;
+    const searchTerm = `%${search}%`;
+    params.push(searchTerm, searchTerm, searchTerm);
+  }
+
+  // Add user filter
+  if (userId) {
+    query += ` AND qa.user_id = ?`;
+    params.push(userId);
+  }
+
+  // Add date range filter
+  if (startDate) {
+    query += ` AND DATE(qa.completed_at) >= ?`;
+    params.push(startDate);
+  }
+
+  if (endDate) {
+    query += ` AND DATE(qa.completed_at) <= ?`;
+    params.push(endDate);
+  }
+
+  // Add score range filter
+  if (minScore !== undefined) {
+    query += ` AND (qa.score * 100.0 / qa.total_questions) >= ?`;
+    params.push(minScore);
+  }
+
+  if (maxScore !== undefined) {
+    query += ` AND (qa.score * 100.0 / qa.total_questions) <= ?`;
+    params.push(maxScore);
+  }
+
+  // Add sorting
+  const validSortFields = ["completed_at", "score", "username", "quiz_title"];
+  const sortField = validSortFields.includes(sortBy) ? sortBy : "completed_at";
+  const order = sortOrder.toLowerCase() === "asc" ? "ASC" : "DESC";
+
+  if (sortField === "score") {
+    query += ` ORDER BY (qa.score * 100.0 / qa.total_questions) ${order}`;
+  } else if (sortField === "username") {
+    query += ` ORDER BY u.username ${order}`;
+  } else if (sortField === "quiz_title") {
+    query += ` ORDER BY q.title ${order}`;
+  } else {
+    query += ` ORDER BY qa.${sortField} ${order}`;
+  }
+
+  db.all(query, params, (err, attempts) => {
+    if (err) {
+      return res.status(500).json({ error: "Database error" });
+    }
+    res.json(attempts);
+  });
+});
+
 app.get(
   "/api/admin/recent-attempts",
   authenticateToken,

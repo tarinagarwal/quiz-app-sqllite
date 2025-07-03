@@ -1,7 +1,15 @@
-import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { LogOut, User, Settings, BookOpen, Trophy, BarChart3 } from 'lucide-react';
+import React from "react";
+import { Link, useLocation } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import {
+  LogOut,
+  User,
+  Settings,
+  BookOpen,
+  Trophy,
+  BarChart3,
+  Search,
+} from "lucide-react";
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -28,9 +36,9 @@ const Navbar = () => {
             <Link
               to="/dashboard"
               className={`flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors ${
-                isActive('/dashboard') 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+                isActive("/dashboard")
+                  ? "bg-blue-100 text-blue-700"
+                  : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
               }`}
             >
               <BookOpen className="h-4 w-4" />
@@ -40,35 +48,51 @@ const Navbar = () => {
             <Link
               to="/history"
               className={`flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors ${
-                isActive('/history') 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+                isActive("/history")
+                  ? "bg-blue-100 text-blue-700"
+                  : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
               }`}
             >
               <Trophy className="h-4 w-4" />
               <span>History</span>
             </Link>
 
-            {user.role === 'admin' && (
-              <Link
-                to="/admin"
-                className={`flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors ${
-                  isActive('/admin') 
-                    ? 'bg-purple-100 text-purple-700' 
-                    : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50'
-                }`}
-              >
-                <BarChart3 className="h-4 w-4" />
-                <span>Admin</span>
-              </Link>
+            {user.role === "admin" && (
+              <>
+                <Link
+                  to="/admin"
+                  className={`flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors ${
+                    isActive("/admin")
+                      ? "bg-purple-100 text-purple-700"
+                      : "text-gray-600 hover:text-purple-600 hover:bg-purple-50"
+                  }`}
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  <span>Admin</span>
+                </Link>
+
+                <Link
+                  to="/admin/attempts"
+                  className={`flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors ${
+                    isActive("/admin/attempts")
+                      ? "bg-purple-100 text-purple-700"
+                      : "text-gray-600 hover:text-purple-600 hover:bg-purple-50"
+                  }`}
+                >
+                  <Search className="h-4 w-4" />
+                  <span>Attempts</span>
+                </Link>
+              </>
             )}
 
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-2 bg-gray-100 rounded-lg px-3 py-2">
                 <User className="h-4 w-4 text-gray-600" />
-                <span className="text-sm font-medium text-gray-700">{user.username}</span>
+                <span className="text-sm font-medium text-gray-700">
+                  {user.username}
+                </span>
               </div>
-              
+
               <button
                 onClick={logout}
                 className="flex items-center space-x-1 text-gray-600 hover:text-red-600 transition-colors"
