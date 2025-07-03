@@ -10,12 +10,15 @@ import {
   Trophy,
   BarChart3,
   PieChart,
+  Download,
+  User,
 } from "lucide-react";
 import {
   ScoreDistributionChart,
   QuizPerformanceChart,
   GradeDistributionChart,
 } from "../components/Charts";
+import { generateAdminReport } from "../utils/pdfExport";
 
 interface Stats {
   totalUsers: number;
@@ -39,6 +42,12 @@ interface ChartData {
   gradeDistribution: { grade: string; count: number; color: string }[];
 }
 
+interface UserData {
+  id: number;
+  username: string;
+  email: string;
+}
+
 const AdminDashboard = () => {
   const [stats, setStats] = useState<Stats>({
     totalUsers: 0,
@@ -52,6 +61,9 @@ const AdminDashboard = () => {
     quizPerformance: [],
     gradeDistribution: [],
   });
+  const [users, setUsers] = useState<UserData[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<number | "">("");
+  const [exportLoading, setExportLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -61,20 +73,45 @@ const AdminDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [statsResponse, attemptsResponse, analyticsResponse] =
-        await Promise.all([
-          api.get("/admin/stats"),
-          api.get("/admin/recent-attempts"),
-          api.get("/admin/analytics"),
-        ]);
+      const [
+        statsResponse,
+        attemptsResponse,
+        analyticsResponse,
+        usersResponse,
+      ] = await Promise.all([
+        api.get("/admin/stats"),
+        api.get("/admin/recent-attempts"),
+        api.get("/admin/analytics"),
+        api.get("/admin/users"),
+      ]);
 
       setStats(statsResponse.data);
       setRecentAttempts(attemptsResponse.data);
       setChartData(analyticsResponse.data);
+      setUsers(usersResponse.data);
     } catch (err) {
       setError("Failed to fetch admin data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    setExportLoading(true);
+    try {
+      const reportResponse = await api.get("/admin/export-data");
+      const reportData = reportResponse.data;
+
+      if (selectedUserId) {
+        await generateAdminReport(reportData, Number(selectedUserId));
+      } else {
+        await generateAdminReport(reportData);
+      }
+    } catch (error) {
+      console.error("Failed to generate PDF:", error);
+      setError("Failed to generate PDF report");
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -95,13 +132,49 @@ const AdminDashboard = () => {
             Manage quizzes and monitor performance
           </p>
         </div>
-        <Link
-          to="/admin/create-quiz"
-          className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all"
-        >
-          <Plus className="h-5 w-5" />
-          <span>Create Quiz</span>
-        </Link>
+        <div className="flex items-center space-x-4">
+          {/* Export Controls */}
+          <div className="flex items-center space-x-3 bg-white/80 backdrop-blur-md rounded-lg p-3 border border-white/20">
+            <User className="h-5 w-5 text-gray-600" />
+            <select
+              value={selectedUserId}
+              onChange={(e) =>
+                setSelectedUserId(
+                  e.target.value === "" ? "" : Number(e.target.value)
+                )
+              }
+              className="bg-transparent border-none focus:ring-0 text-sm text-gray-700"
+            >
+              <option value="">All Users</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.username}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={handleExportPDF}
+            disabled={exportLoading}
+            className="flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white px-4 py-3 rounded-lg font-medium hover:from-purple-700 hover:to-purple-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {exportLoading ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+            ) : (
+              <Download className="h-5 w-5" />
+            )}
+            <span>Export PDF</span>
+          </button>
+
+          <Link
+            to="/admin/create-quiz"
+            className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Create Quiz</span>
+          </Link>
+        </div>
       </div>
 
       {error && (

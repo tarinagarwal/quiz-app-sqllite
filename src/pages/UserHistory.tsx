@@ -7,8 +7,11 @@ import {
   Calendar,
   TrendingUp,
   BarChart3,
+  Download,
 } from "lucide-react";
 import { UserProgressChart } from "../components/Charts";
+import { generateUserReport } from "../utils/pdfExport";
+import { useAuth } from "../contexts/AuthContext";
 
 interface Attempt {
   id: number;
@@ -20,8 +23,10 @@ interface Attempt {
 }
 
 const UserHistory = () => {
+  const { user } = useAuth();
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exportLoading, setExportLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -54,7 +59,7 @@ const UserHistory = () => {
 
   const calculateStats = () => {
     if (attempts.length === 0)
-      return { avgScore: 0, totalQuizzes: 0, bestScore: 0 };
+      return { avgScore: 0, totalQuizzes: 0, bestScore: 0, totalTimeSpent: 0 };
 
     const totalScore = attempts.reduce(
       (sum, attempt) => sum + attempt.score,
@@ -69,11 +74,16 @@ const UserHistory = () => {
     const bestScore = Math.max(
       ...attempts.map((a) => Math.round((a.score / a.total_questions) * 100))
     );
+    const totalTimeSpent = attempts.reduce(
+      (sum, attempt) => sum + attempt.time_taken,
+      0
+    );
 
     return {
       avgScore,
       totalQuizzes: attempts.length,
       bestScore,
+      totalTimeSpent,
     };
   };
 
@@ -89,6 +99,21 @@ const UserHistory = () => {
       }));
   };
 
+  const handleExportPDF = async () => {
+    if (!user) return;
+
+    setExportLoading(true);
+    try {
+      const stats = calculateStats();
+      await generateUserReport(user.username, attempts, stats);
+    } catch (error) {
+      console.error("Failed to generate PDF:", error);
+      setError("Failed to generate PDF report");
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   const stats = calculateStats();
   const progressData = getProgressData();
 
@@ -102,13 +127,27 @@ const UserHistory = () => {
 
   return (
     <div className="space-y-8">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Your Quiz History
-        </h1>
-        <p className="text-lg text-gray-600">
-          Track your progress and performance
-        </p>
+      <div className="flex items-center justify-between">
+        <div className="text-center flex-1">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Your Quiz History
+          </h1>
+          <p className="text-lg text-gray-600">
+            Track your progress and performance
+          </p>
+        </div>
+        <button
+          onClick={handleExportPDF}
+          disabled={exportLoading || attempts.length === 0}
+          className="flex items-center space-x-2 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:from-green-700 hover:to-green-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {exportLoading ? (
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+          ) : (
+            <Download className="h-5 w-5" />
+          )}
+          <span>Export PDF</span>
+        </button>
       </div>
 
       {error && (

@@ -541,6 +541,154 @@ app.get("/api/admin/analytics", authenticateToken, requireAdmin, (req, res) => {
   );
 });
 
+app.get("/api/admin/users", authenticateToken, requireAdmin, (req, res) => {
+  db.all(
+    'SELECT id, username, email FROM users WHERE role = "user" ORDER BY username',
+    (err, users) => {
+      if (err) {
+        return res.status(500).json({ error: "Database error" });
+      }
+      res.json(users);
+    }
+  );
+});
+
+app.get(
+  "/api/admin/export-data",
+  authenticateToken,
+  requireAdmin,
+  (req, res) => {
+    // Get overall stats
+    db.get("SELECT COUNT(*) as totalUsers FROM users", (err, userCount) => {
+      if (err) return res.status(500).json({ error: "Database error" });
+
+      db.get(
+        "SELECT COUNT(*) as totalQuizzes FROM quizzes",
+        (err, quizCount) => {
+          if (err) return res.status(500).json({ error: "Database error" });
+
+          db.get(
+            "SELECT COUNT(*) as totalAttempts FROM quiz_attempts",
+            (err, attemptCount) => {
+              if (err) return res.status(500).json({ error: "Database error" });
+
+              db.get(
+                "SELECT AVG(score * 100.0 / total_questions) as avgScore FROM quiz_attempts",
+                (err, avgScore) => {
+                  if (err)
+                    return res.status(500).json({ error: "Database error" });
+
+                  const overallStats = {
+                    totalUsers: userCount.totalUsers,
+                    totalQuizzes: quizCount.totalQuizzes,
+                    totalAttempts: attemptCount.totalAttempts,
+                    averageScore: Math.round(avgScore.avgScore || 0),
+                  };
+
+                  // Get all users with their attempts
+                  db.all(
+                    `SELECT u.id, u.username, u.email,
+                  qa.id as attempt_id, qa.quiz_id, qa.score, qa.total_questions, 
+                  qa.time_taken, qa.completed_at, q.title as quiz_title
+                  FROM users u
+                  LEFT JOIN quiz_attempts qa ON u.id = qa.user_id
+                  LEFT JOIN quizzes q ON qa.quiz_id = q.id
+                  WHERE u.role = 'user'
+                  ORDER BY u.username, qa.completed_at DESC`,
+                    (err, userAttempts) => {
+                      if (err)
+                        return res
+                          .status(500)
+                          .json({ error: "Database error" });
+
+                      // Group attempts by user
+                      const usersMap = new Map();
+
+                      userAttempts.forEach((row) => {
+                        if (!usersMap.has(row.id)) {
+                          usersMap.set(row.id, {
+                            id: row.id,
+                            username: row.username,
+                            email: row.email,
+                            attempts: [],
+                            stats: {
+                              totalQuizzes: 0,
+                              avgScore: 0,
+                              bestScore: 0,
+                              totalTimeSpent: 0,
+                            },
+                          });
+                        }
+
+                        const user = usersMap.get(row.id);
+
+                        if (row.attempt_id) {
+                          user.attempts.push({
+                            id: row.attempt_id,
+                            quiz_title: row.quiz_title,
+                            score: row.score,
+                            total_questions: row.total_questions,
+                            time_taken: row.time_taken,
+                            completed_at: row.completed_at,
+                          });
+                        }
+                      });
+
+                      // Calculate user stats
+                      const users = Array.from(usersMap.values()).map(
+                        (user) => {
+                          if (user.attempts.length > 0) {
+                            const totalScore = user.attempts.reduce(
+                              (sum, attempt) => sum + attempt.score,
+                              0
+                            );
+                            const totalQuestions = user.attempts.reduce(
+                              (sum, attempt) => sum + attempt.total_questions,
+                              0
+                            );
+                            const avgScore =
+                              totalQuestions > 0
+                                ? Math.round(
+                                    (totalScore / totalQuestions) * 100
+                                  )
+                                : 0;
+                            const bestScore = Math.max(
+                              ...user.attempts.map((a) =>
+                                Math.round((a.score / a.total_questions) * 100)
+                              )
+                            );
+                            const totalTimeSpent = user.attempts.reduce(
+                              (sum, attempt) => sum + attempt.time_taken,
+                              0
+                            );
+
+                            user.stats = {
+                              totalQuizzes: user.attempts.length,
+                              avgScore,
+                              bestScore,
+                              totalTimeSpent,
+                            };
+                          }
+                          return user;
+                        }
+                      );
+
+                      res.json({
+                        users,
+                        overallStats,
+                      });
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
+    });
+  }
+);
+
 app.get(
   "/api/admin/recent-attempts",
   authenticateToken,

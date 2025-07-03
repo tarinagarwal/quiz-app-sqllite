@@ -1,0 +1,517 @@
+import jsPDF from "jspdf";
+
+
+interface UserAttempt {
+  id: number;
+  quiz_title: string;
+  score: number;
+  total_questions: number;
+  time_taken: number;
+  completed_at: string;
+}
+
+interface UserStats {
+  totalQuizzes: number;
+  avgScore: number;
+  bestScore: number;
+  totalTimeSpent: number;
+}
+
+interface AdminReportData {
+  users: {
+    id: number;
+    username: string;
+    email: string;
+    attempts: UserAttempt[];
+    stats: UserStats;
+  }[];
+  overallStats: {
+    totalUsers: number;
+    totalQuizzes: number;
+    totalAttempts: number;
+    averageScore: number;
+  };
+}
+
+export const generateUserReport = async (
+  username: string,
+  attempts: UserAttempt[],
+  stats: UserStats
+): Promise<void> => {
+  const pdf = new jsPDF();
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  let yPosition = 20;
+
+  // Header
+  pdf.setFontSize(24);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(59, 130, 246); // Blue color
+  pdf.text("QuizMaster Performance Report", pageWidth / 2, yPosition, {
+    align: "center",
+  });
+
+  yPosition += 15;
+  pdf.setFontSize(16);
+  pdf.setTextColor(75, 85, 99); // Gray color
+  pdf.text(`User: ${username}`, pageWidth / 2, yPosition, { align: "center" });
+
+  yPosition += 10;
+  pdf.setFontSize(12);
+  pdf.text(
+    `Generated on: ${new Date().toLocaleDateString()}`,
+    pageWidth / 2,
+    yPosition,
+    { align: "center" }
+  );
+
+  // Stats Section
+  yPosition += 25;
+  pdf.setFontSize(18);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(31, 41, 55); // Dark gray
+  pdf.text("Performance Summary", 20, yPosition);
+
+  yPosition += 15;
+  pdf.setFontSize(12);
+  pdf.setFont("helvetica", "normal");
+
+  // Stats boxes
+  const statsData = [
+    { label: "Total Quizzes Taken", value: stats.totalQuizzes.toString() },
+    { label: "Average Score", value: `${stats.avgScore}%` },
+    { label: "Best Score", value: `${stats.bestScore}%` },
+    { label: "Total Time Spent", value: formatTotalTime(stats.totalTimeSpent) },
+  ];
+
+  const boxWidth = (pageWidth - 60) / 2;
+  const boxHeight = 25;
+  let boxX = 20;
+  let boxY = yPosition;
+
+  statsData.forEach((stat, index) => {
+    if (index % 2 === 0 && index > 0) {
+      boxY += boxHeight + 10;
+      boxX = 20;
+    } else if (index % 2 === 1) {
+      boxX = pageWidth / 2 + 10;
+    }
+
+    // Draw box
+    pdf.setDrawColor(229, 231, 235);
+    pdf.setFillColor(249, 250, 251);
+    pdf.roundedRect(boxX, boxY, boxWidth, boxHeight, 3, 3, "FD");
+
+    // Add text
+    pdf.setTextColor(75, 85, 99);
+    pdf.text(stat.label, boxX + 5, boxY + 8);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(31, 41, 55);
+    pdf.text(stat.value, boxX + 5, boxY + 18);
+    pdf.setFont("helvetica", "normal");
+  });
+
+  yPosition = boxY + boxHeight + 30;
+
+  // Quiz Attempts Section
+  if (attempts.length > 0) {
+    pdf.setFontSize(18);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(31, 41, 55);
+    pdf.text("Quiz Attempts History", 20, yPosition);
+
+    yPosition += 20;
+
+    // Table headers
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(75, 85, 99);
+
+    const headers = ["Quiz Title", "Score", "Accuracy", "Time", "Date"];
+    const colWidths = [70, 25, 25, 25, 35];
+    let xPos = 20;
+
+    headers.forEach((header, index) => {
+      pdf.text(header, xPos, yPosition);
+      xPos += colWidths[index];
+    });
+
+    yPosition += 5;
+    pdf.setDrawColor(229, 231, 235);
+    pdf.line(20, yPosition, pageWidth - 20, yPosition);
+    yPosition += 10;
+
+    // Table rows
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9);
+
+    attempts.slice(0, 15).forEach((attempt, index) => {
+      if (yPosition > pageHeight - 30) {
+        pdf.addPage();
+        yPosition = 30;
+      }
+
+      xPos = 20;
+      const percentage = Math.round(
+        (attempt.score / attempt.total_questions) * 100
+      );
+
+      // Alternate row colors
+      if (index % 2 === 0) {
+        pdf.setFillColor(249, 250, 251);
+        pdf.rect(20, yPosition - 8, pageWidth - 40, 12, "F");
+      }
+
+      pdf.setTextColor(31, 41, 55);
+
+      const rowData = [
+        attempt.quiz_title.length > 25
+          ? attempt.quiz_title.substring(0, 25) + "..."
+          : attempt.quiz_title,
+        `${attempt.score}/${attempt.total_questions}`,
+        `${percentage}%`,
+        formatTime(attempt.time_taken),
+        new Date(attempt.completed_at).toLocaleDateString(),
+      ];
+
+      rowData.forEach((data, colIndex) => {
+        pdf.text(data, xPos, yPosition);
+        xPos += colWidths[colIndex];
+      });
+
+      yPosition += 12;
+    });
+
+    if (attempts.length > 15) {
+      yPosition += 10;
+      pdf.setFontSize(10);
+      pdf.setTextColor(107, 114, 128);
+      pdf.text(`... and ${attempts.length - 15} more attempts`, 20, yPosition);
+    }
+  }
+
+  // Footer
+  const footerY = pageHeight - 20;
+  pdf.setFontSize(8);
+  pdf.setTextColor(156, 163, 175);
+  pdf.text(
+    "Generated by QuizMaster - Quiz Performance Analytics",
+    pageWidth / 2,
+    footerY,
+    { align: "center" }
+  );
+
+  // Save the PDF
+  pdf.save(
+    `${username}_quiz_report_${new Date().toISOString().split("T")[0]}.pdf`
+  );
+};
+
+export const generateAdminReport = async (
+  reportData: AdminReportData,
+  selectedUserId?: number
+): Promise<void> => {
+  const pdf = new jsPDF();
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  let yPosition = 20;
+
+  const isUserSpecific = selectedUserId !== undefined;
+  const userData = isUserSpecific
+    ? reportData.users.find((u) => u.id === selectedUserId)
+    : null;
+
+  // Header
+  pdf.setFontSize(24);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(59, 130, 246);
+  pdf.text("QuizMaster Admin Report", pageWidth / 2, yPosition, {
+    align: "center",
+  });
+
+  yPosition += 15;
+  pdf.setFontSize(16);
+  pdf.setTextColor(75, 85, 99);
+
+  if (isUserSpecific && userData) {
+    pdf.text(`User Report: ${userData.username}`, pageWidth / 2, yPosition, {
+      align: "center",
+    });
+  } else {
+    pdf.text("System-wide Performance Report", pageWidth / 2, yPosition, {
+      align: "center",
+    });
+  }
+
+  yPosition += 10;
+  pdf.setFontSize(12);
+  pdf.text(
+    `Generated on: ${new Date().toLocaleDateString()}`,
+    pageWidth / 2,
+    yPosition,
+    { align: "center" }
+  );
+
+  if (isUserSpecific && userData) {
+    // User-specific report
+    yPosition += 25;
+    pdf.setFontSize(18);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(31, 41, 55);
+    pdf.text("User Performance Summary", 20, yPosition);
+
+    yPosition += 15;
+    pdf.setFontSize(12);
+    pdf.setFont("helvetica", "normal");
+
+    const userStatsData = [
+      { label: "Email", value: userData.email },
+      {
+        label: "Total Quizzes Taken",
+        value: userData.stats.totalQuizzes.toString(),
+      },
+      { label: "Average Score", value: `${userData.stats.avgScore}%` },
+      { label: "Best Score", value: `${userData.stats.bestScore}%` },
+    ];
+
+    userStatsData.forEach((stat) => {
+      pdf.setTextColor(75, 85, 99);
+      pdf.text(`${stat.label}:`, 20, yPosition);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(31, 41, 55);
+      pdf.text(stat.value, 80, yPosition);
+      pdf.setFont("helvetica", "normal");
+      yPosition += 12;
+    });
+
+    // User's quiz attempts
+    if (userData.attempts.length > 0) {
+      yPosition += 20;
+      pdf.setFontSize(16);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Quiz Attempts", 20, yPosition);
+      yPosition += 15;
+
+      // Table headers
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(75, 85, 99);
+
+      const headers = ["Quiz Title", "Score", "Accuracy", "Time", "Date"];
+      const colWidths = [70, 25, 25, 25, 35];
+      let xPos = 20;
+
+      headers.forEach((header, index) => {
+        pdf.text(header, xPos, yPosition);
+        xPos += colWidths[index];
+      });
+
+      yPosition += 5;
+      pdf.setDrawColor(229, 231, 235);
+      pdf.line(20, yPosition, pageWidth - 20, yPosition);
+      yPosition += 10;
+
+      // Table rows
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+
+      userData.attempts.forEach((attempt, index) => {
+        if (yPosition > pageHeight - 30) {
+          pdf.addPage();
+          yPosition = 30;
+        }
+
+        xPos = 20;
+        const percentage = Math.round(
+          (attempt.score / attempt.total_questions) * 100
+        );
+
+        if (index % 2 === 0) {
+          pdf.setFillColor(249, 250, 251);
+          pdf.rect(20, yPosition - 8, pageWidth - 40, 12, "F");
+        }
+
+        pdf.setTextColor(31, 41, 55);
+
+        const rowData = [
+          attempt.quiz_title.length > 25
+            ? attempt.quiz_title.substring(0, 25) + "..."
+            : attempt.quiz_title,
+          `${attempt.score}/${attempt.total_questions}`,
+          `${percentage}%`,
+          formatTime(attempt.time_taken),
+          new Date(attempt.completed_at).toLocaleDateString(),
+        ];
+
+        rowData.forEach((data, colIndex) => {
+          pdf.text(data, xPos, yPosition);
+          xPos += colWidths[colIndex];
+        });
+
+        yPosition += 12;
+      });
+    }
+  } else {
+    // System-wide report
+    yPosition += 25;
+    pdf.setFontSize(18);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(31, 41, 55);
+    pdf.text("System Overview", 20, yPosition);
+
+    yPosition += 15;
+    pdf.setFontSize(12);
+    pdf.setFont("helvetica", "normal");
+
+    const systemStats = [
+      {
+        label: "Total Users",
+        value: reportData.overallStats.totalUsers.toString(),
+      },
+      {
+        label: "Total Quizzes",
+        value: reportData.overallStats.totalQuizzes.toString(),
+      },
+      {
+        label: "Total Attempts",
+        value: reportData.overallStats.totalAttempts.toString(),
+      },
+      {
+        label: "System Average Score",
+        value: `${reportData.overallStats.averageScore}%`,
+      },
+    ];
+
+    const boxWidth = (pageWidth - 60) / 2;
+    const boxHeight = 25;
+    let boxX = 20;
+    let boxY = yPosition;
+
+    systemStats.forEach((stat, index) => {
+      if (index % 2 === 0 && index > 0) {
+        boxY += boxHeight + 10;
+        boxX = 20;
+      } else if (index % 2 === 1) {
+        boxX = pageWidth / 2 + 10;
+      }
+
+      pdf.setDrawColor(229, 231, 235);
+      pdf.setFillColor(249, 250, 251);
+      pdf.roundedRect(boxX, boxY, boxWidth, boxHeight, 3, 3, "FD");
+
+      pdf.setTextColor(75, 85, 99);
+      pdf.text(stat.label, boxX + 5, boxY + 8);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(31, 41, 55);
+      pdf.text(stat.value, boxX + 5, boxY + 18);
+      pdf.setFont("helvetica", "normal");
+    });
+
+    yPosition = boxY + boxHeight + 30;
+
+    // User Performance Summary
+    pdf.setFontSize(16);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("User Performance Summary", 20, yPosition);
+    yPosition += 15;
+
+    // Table headers
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(75, 85, 99);
+
+    const userHeaders = [
+      "Username",
+      "Email",
+      "Quizzes",
+      "Avg Score",
+      "Best Score",
+    ];
+    const userColWidths = [40, 60, 25, 25, 25];
+    let xPos = 20;
+
+    userHeaders.forEach((header, index) => {
+      pdf.text(header, xPos, yPosition);
+      xPos += userColWidths[index];
+    });
+
+    yPosition += 5;
+    pdf.setDrawColor(229, 231, 235);
+    pdf.line(20, yPosition, pageWidth - 20, yPosition);
+    yPosition += 10;
+
+    // User rows
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9);
+
+    reportData.users.forEach((user, index) => {
+      if (yPosition > pageHeight - 30) {
+        pdf.addPage();
+        yPosition = 30;
+      }
+
+      xPos = 20;
+
+      if (index % 2 === 0) {
+        pdf.setFillColor(249, 250, 251);
+        pdf.rect(20, yPosition - 8, pageWidth - 40, 12, "F");
+      }
+
+      pdf.setTextColor(31, 41, 55);
+
+      const userRowData = [
+        user.username,
+        user.email.length > 20
+          ? user.email.substring(0, 20) + "..."
+          : user.email,
+        user.stats.totalQuizzes.toString(),
+        `${user.stats.avgScore}%`,
+        `${user.stats.bestScore}%`,
+      ];
+
+      userRowData.forEach((data, colIndex) => {
+        pdf.text(data, xPos, yPosition);
+        xPos += userColWidths[colIndex];
+      });
+
+      yPosition += 12;
+    });
+  }
+
+  // Footer
+  const footerY = pageHeight - 20;
+  pdf.setFontSize(8);
+  pdf.setTextColor(156, 163, 175);
+  pdf.text(
+    "Generated by QuizMaster - Admin Analytics Dashboard",
+    pageWidth / 2,
+    footerY,
+    { align: "center" }
+  );
+
+  // Save the PDF
+  const filename =
+    isUserSpecific && userData
+      ? `admin_report_${userData.username}_${
+          new Date().toISOString().split("T")[0]
+        }.pdf`
+      : `admin_report_all_users_${new Date().toISOString().split("T")[0]}.pdf`;
+
+  pdf.save(filename);
+};
+
+const formatTime = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}m ${secs}s`;
+};
+
+const formatTotalTime = (seconds: number): string => {
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+
+  if (hours > 0) {
+    return `${hours}h ${mins}m`;
+  }
+  return `${mins}m`;
+};
