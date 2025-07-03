@@ -1,11 +1,11 @@
-import express from 'express';
-import cors from 'cors';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import sqlite3 from 'sqlite3';
-import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import express from "express";
+import cors from "cors";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import sqlite3 from "sqlite3";
+import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 
 dotenv.config();
 
@@ -14,14 +14,15 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
+const JWT_SECRET =
+  process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production";
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
 // Database setup
-const db = new sqlite3.Database(join(__dirname, 'quiz.db'));
+const db = new sqlite3.Database(join(__dirname, "quiz.db"));
 
 // Initialize database tables
 db.serialize(() => {
@@ -76,9 +77,12 @@ db.serialize(() => {
   )`);
 
   // Create admin user if not exists
-  const adminPassword = bcrypt.hashSync('admin123', 10);
-  db.run(`INSERT OR IGNORE INTO users (username, email, password, role) 
-          VALUES ('admin', 'admin@quiz.com', ?, 'admin')`, [adminPassword]);
+  const adminPassword = bcrypt.hashSync("admin123", 10);
+  db.run(
+    `INSERT OR IGNORE INTO users (username, email, password, role) 
+          VALUES ('admin', 'admin@quiz.com', ?, 'admin')`,
+    [adminPassword]
+  );
 
   // Create sample quiz
   db.run(`INSERT OR IGNORE INTO quizzes (id, title, description, category, difficulty, time_limit, created_by) 
@@ -88,74 +92,86 @@ db.serialize(() => {
   const sampleQuestions = [
     {
       quiz_id: 1,
-      question: 'What is the correct way to declare a variable in JavaScript?',
-      option_a: 'variable x = 5;',
-      option_b: 'var x = 5;',
-      option_c: 'v x = 5;',
-      option_d: 'declare x = 5;',
-      correct_answer: 'b',
-      points: 1
+      question: "What is the correct way to declare a variable in JavaScript?",
+      option_a: "variable x = 5;",
+      option_b: "var x = 5;",
+      option_c: "v x = 5;",
+      option_d: "declare x = 5;",
+      correct_answer: "b",
+      points: 1,
     },
     {
       quiz_id: 1,
-      question: 'Which method is used to add an element to the end of an array?',
-      option_a: 'push()',
-      option_b: 'pop()',
-      option_c: 'shift()',
-      option_d: 'unshift()',
-      correct_answer: 'a',
-      points: 1
+      question:
+        "Which method is used to add an element to the end of an array?",
+      option_a: "push()",
+      option_b: "pop()",
+      option_c: "shift()",
+      option_d: "unshift()",
+      correct_answer: "a",
+      points: 1,
     },
     {
       quiz_id: 1,
-      question: 'What does === operator do in JavaScript?',
-      option_a: 'Assigns a value',
-      option_b: 'Compares values only',
-      option_c: 'Compares values and types',
-      option_d: 'Compares types only',
-      correct_answer: 'c',
-      points: 1
+      question: "What does === operator do in JavaScript?",
+      option_a: "Assigns a value",
+      option_b: "Compares values only",
+      option_c: "Compares values and types",
+      option_d: "Compares types only",
+      correct_answer: "c",
+      points: 1,
     },
     {
       quiz_id: 1,
-      question: 'Which of the following is NOT a JavaScript data type?',
-      option_a: 'String',
-      option_b: 'Number',
-      option_c: 'Float',
-      option_d: 'Boolean',
-      correct_answer: 'c',
-      points: 1
+      question: "Which of the following is NOT a JavaScript data type?",
+      option_a: "String",
+      option_b: "Number",
+      option_c: "Float",
+      option_d: "Boolean",
+      correct_answer: "c",
+      points: 1,
     },
     {
       quiz_id: 1,
-      question: 'How do you create a function in JavaScript?',
-      option_a: 'create function myFunction() {}',
-      option_b: 'function myFunction() {}',
-      option_c: 'def myFunction() {}',
-      option_d: 'func myFunction() {}',
-      correct_answer: 'b',
-      points: 1
-    }
+      question: "How do you create a function in JavaScript?",
+      option_a: "create function myFunction() {}",
+      option_b: "function myFunction() {}",
+      option_c: "def myFunction() {}",
+      option_d: "func myFunction() {}",
+      correct_answer: "b",
+      points: 1,
+    },
   ];
 
-  sampleQuestions.forEach(q => {
-    db.run(`INSERT OR IGNORE INTO questions (quiz_id, question, option_a, option_b, option_c, option_d, correct_answer, points) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, 
-           [q.quiz_id, q.question, q.option_a, q.option_b, q.option_c, q.option_d, q.correct_answer, q.points]);
+  sampleQuestions.forEach((q) => {
+    db.run(
+      `INSERT OR IGNORE INTO questions (quiz_id, question, option_a, option_b, option_c, option_d, correct_answer, points) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        q.quiz_id,
+        q.question,
+        q.option_a,
+        q.option_b,
+        q.option_c,
+        q.option_d,
+        q.correct_answer,
+        q.points,
+      ]
+    );
   });
 });
 
 // Auth middleware
 const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
 
   if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
+    return res.status(401).json({ error: "Access token required" });
   }
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: 'Invalid token' });
+    if (err) return res.status(403).json({ error: "Invalid token" });
     req.user = user;
     next();
   });
@@ -163,222 +179,264 @@ const authenticateToken = (req, res, next) => {
 
 // Admin middleware
 const requireAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required' });
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ error: "Admin access required" });
   }
   next();
 };
 
 // Auth routes
-app.post('/api/register', async (req, res) => {
+app.post("/api/register", async (req, res) => {
   const { username, email, password } = req.body;
 
   if (!username || !email || !password) {
-    return res.status(400).json({ error: 'All fields are required' });
+    return res.status(400).json({ error: "All fields are required" });
   }
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    
-    db.run('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', 
-           [username, email, hashedPassword], function(err) {
-      if (err) {
-        if (err.message.includes('UNIQUE constraint failed')) {
-          return res.status(400).json({ error: 'Username or email already exists' });
+
+    db.run(
+      "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
+      [username, email, hashedPassword],
+      function (err) {
+        if (err) {
+          if (err.message.includes("UNIQUE constraint failed")) {
+            return res
+              .status(400)
+              .json({ error: "Username or email already exists" });
+          }
+          return res.status(500).json({ error: "Database error" });
         }
-        return res.status(500).json({ error: 'Database error' });
+
+        const token = jwt.sign(
+          { id: this.lastID, username, email, role: "user" },
+          JWT_SECRET,
+          { expiresIn: "24h" }
+        );
+
+        res.json({
+          token,
+          user: { id: this.lastID, username, email, role: "user" },
+        });
       }
-
-      const token = jwt.sign(
-        { id: this.lastID, username, email, role: 'user' },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-      );
-
-      res.json({ 
-        token, 
-        user: { id: this.lastID, username, email, role: 'user' } 
-      });
-    });
+    );
   } catch (error) {
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-app.post('/api/login', async (req, res) => {
+app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
+    return res
+      .status(400)
+      .json({ error: "Username and password are required" });
   }
 
-  db.get('SELECT * FROM users WHERE username = ?', [username], async (err, user) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
-
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    try {
-      const isValidPassword = await bcrypt.compare(password, user.password);
-      
-      if (!isValidPassword) {
-        return res.status(401).json({ error: 'Invalid credentials' });
+  db.get(
+    "SELECT * FROM users WHERE username = ?",
+    [username],
+    async (err, user) => {
+      if (err) {
+        return res.status(500).json({ error: "Database error" });
       }
 
-      const token = jwt.sign(
-        { id: user.id, username: user.username, email: user.email, role: user.role },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-      );
+      if (!user) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
 
-      res.json({ 
-        token, 
-        user: { 
-          id: user.id, 
-          username: user.username, 
-          email: user.email, 
-          role: user.role 
-        } 
-      });
-    } catch (error) {
-      res.status(500).json({ error: 'Server error' });
+      try {
+        const isValidPassword = await bcrypt.compare(password, user.password);
+
+        if (!isValidPassword) {
+          return res.status(401).json({ error: "Invalid credentials" });
+        }
+
+        const token = jwt.sign(
+          {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            role: user.role,
+          },
+          JWT_SECRET,
+          { expiresIn: "24h" }
+        );
+
+        res.json({
+          token,
+          user: {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            role: user.role,
+          },
+        });
+      } catch (error) {
+        res.status(500).json({ error: "Server error" });
+      }
     }
-  });
+  );
 });
 
 // Quiz routes
-app.get('/api/quizzes', authenticateToken, (req, res) => {
-  db.all(`SELECT q.*, u.username as created_by_name,
+app.get("/api/quizzes", authenticateToken, (req, res) => {
+  db.all(
+    `SELECT q.*, u.username as created_by_name,
           COUNT(qa.id) as attempts_count
           FROM quizzes q
           LEFT JOIN users u ON q.created_by = u.id
           LEFT JOIN quiz_attempts qa ON q.id = qa.quiz_id
           GROUP BY q.id
-          ORDER BY q.created_at DESC`, (err, quizzes) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
-    res.json(quizzes);
-  });
-});
-
-app.get('/api/quizzes/:id', authenticateToken, (req, res) => {
-  const quizId = req.params.id;
-  
-  db.get('SELECT * FROM quizzes WHERE id = ?', [quizId], (err, quiz) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
-    
-    if (!quiz) {
-      return res.status(404).json({ error: 'Quiz not found' });
-    }
-
-    db.all('SELECT id, question, option_a, option_b, option_c, option_d, points FROM questions WHERE quiz_id = ?', 
-           [quizId], (err, questions) => {
+          ORDER BY q.created_at DESC`,
+    (err, quizzes) => {
       if (err) {
-        return res.status(500).json({ error: 'Database error' });
+        return res.status(500).json({ error: "Database error" });
       }
-      
-      res.json({ ...quiz, questions });
-    });
+      res.json(quizzes);
+    }
+  );
+});
+
+app.get("/api/quizzes/:id", authenticateToken, (req, res) => {
+  const quizId = req.params.id;
+
+  db.get("SELECT * FROM quizzes WHERE id = ?", [quizId], (err, quiz) => {
+    if (err) {
+      return res.status(500).json({ error: "Database error" });
+    }
+
+    if (!quiz) {
+      return res.status(404).json({ error: "Quiz not found" });
+    }
+
+    db.all(
+      "SELECT id, question, option_a, option_b, option_c, option_d, points FROM questions WHERE quiz_id = ?",
+      [quizId],
+      (err, questions) => {
+        if (err) {
+          return res.status(500).json({ error: "Database error" });
+        }
+
+        res.json({ ...quiz, questions });
+      }
+    );
   });
 });
 
-app.post('/api/quizzes/:id/submit', authenticateToken, (req, res) => {
+app.post("/api/quizzes/:id/submit", authenticateToken, (req, res) => {
   const quizId = req.params.id;
   const { answers, timeTaken } = req.body;
   const userId = req.user.id;
 
   // Get quiz questions with correct answers
-  db.all('SELECT id, correct_answer, points FROM questions WHERE quiz_id = ?', 
-         [quizId], (err, questions) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
-
-    let score = 0;
-    let correctAnswers = 0;
-
-    questions.forEach(question => {
-      if (answers[question.id] === question.correct_answer) {
-        score += question.points;
-        correctAnswers++;
-      }
-    });
-
-    // Save quiz attempt
-    db.run(`INSERT INTO quiz_attempts (user_id, quiz_id, score, total_questions, time_taken) 
-            VALUES (?, ?, ?, ?, ?)`, 
-           [userId, quizId, score, questions.length, timeTaken], function(err) {
+  db.all(
+    "SELECT id, correct_answer, points FROM questions WHERE quiz_id = ?",
+    [quizId],
+    (err, questions) => {
       if (err) {
-        return res.status(500).json({ error: 'Database error' });
+        return res.status(500).json({ error: "Database error" });
       }
 
-      res.json({
-        score,
-        totalQuestions: questions.length,
-        correctAnswers,
-        percentage: Math.round((correctAnswers / questions.length) * 100),
-        timeTaken,
-        attemptId: this.lastID
+      let score = 0;
+      let correctAnswers = 0;
+
+      questions.forEach((question) => {
+        if (answers[question.id] === question.correct_answer) {
+          score += question.points;
+          correctAnswers++;
+        }
       });
-    });
-  });
+
+      // Save quiz attempt
+      db.run(
+        `INSERT INTO quiz_attempts (user_id, quiz_id, score, total_questions, time_taken) 
+            VALUES (?, ?, ?, ?, ?)`,
+        [userId, quizId, score, questions.length, timeTaken],
+        function (err) {
+          if (err) {
+            return res.status(500).json({ error: "Database error" });
+          }
+
+          res.json({
+            score,
+            totalQuestions: questions.length,
+            correctAnswers,
+            percentage: Math.round((correctAnswers / questions.length) * 100),
+            timeTaken,
+            attemptId: this.lastID,
+          });
+        }
+      );
+    }
+  );
 });
 
 // Admin routes
-app.post('/api/admin/quizzes', authenticateToken, requireAdmin, (req, res) => {
-  const { title, description, category, difficulty, timeLimit, questions } = req.body;
+app.post("/api/admin/quizzes", authenticateToken, requireAdmin, (req, res) => {
+  const { title, description, category, difficulty, timeLimit, questions } =
+    req.body;
   const createdBy = req.user.id;
 
-  db.run(`INSERT INTO quizzes (title, description, category, difficulty, time_limit, created_by) 
-          VALUES (?, ?, ?, ?, ?, ?)`, 
-         [title, description, category, difficulty, timeLimit, createdBy], function(err) {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
+  db.run(
+    `INSERT INTO quizzes (title, description, category, difficulty, time_limit, created_by) 
+          VALUES (?, ?, ?, ?, ?, ?)`,
+    [title, description, category, difficulty, timeLimit, createdBy],
+    function (err) {
+      if (err) {
+        return res.status(500).json({ error: "Database error" });
+      }
 
-    const quizId = this.lastID;
+      const quizId = this.lastID;
 
-    // Insert questions
-    const stmt = db.prepare(`INSERT INTO questions (quiz_id, question, option_a, option_b, option_c, option_d, correct_answer, points) 
+      // Insert questions
+      const stmt =
+        db.prepare(`INSERT INTO questions (quiz_id, question, option_a, option_b, option_c, option_d, correct_answer, points) 
                              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-    
-    questions.forEach(q => {
-      stmt.run([quizId, q.question, q.option_a, q.option_b, q.option_c, q.option_d, q.correct_answer, q.points || 1]);
-    });
-    
-    stmt.finalize();
 
-    res.json({ id: quizId, message: 'Quiz created successfully' });
-  });
+      questions.forEach((q) => {
+        stmt.run([
+          quizId,
+          q.question,
+          q.option_a,
+          q.option_b,
+          q.option_c,
+          q.option_d,
+          q.correct_answer,
+          q.points || 1,
+        ]);
+      });
+
+      stmt.finalize();
+
+      res.json({ id: quizId, message: "Quiz created successfully" });
+    }
+  );
 });
 
-app.get('/api/admin/stats', authenticateToken, requireAdmin, (req, res) => {
+app.get("/api/admin/stats", authenticateToken, requireAdmin, (req, res) => {
   const stats = {};
 
   // Get total users
-  db.get('SELECT COUNT(*) as total FROM users', (err, result) => {
-    if (err) return res.status(500).json({ error: 'Database error' });
+  db.get("SELECT COUNT(*) as total FROM users", (err, result) => {
+    if (err) return res.status(500).json({ error: "Database error" });
     stats.totalUsers = result.total;
 
     // Get total quizzes
-    db.get('SELECT COUNT(*) as total FROM quizzes', (err, result) => {
-      if (err) return res.status(500).json({ error: 'Database error' });
+    db.get("SELECT COUNT(*) as total FROM quizzes", (err, result) => {
+      if (err) return res.status(500).json({ error: "Database error" });
       stats.totalQuizzes = result.total;
 
       // Get total attempts
-      db.get('SELECT COUNT(*) as total FROM quiz_attempts', (err, result) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
+      db.get("SELECT COUNT(*) as total FROM quiz_attempts", (err, result) => {
+        if (err) return res.status(500).json({ error: "Database error" });
         stats.totalAttempts = result.total;
 
         // Get average score
-        db.get('SELECT AVG(score) as avg FROM quiz_attempts', (err, result) => {
-          if (err) return res.status(500).json({ error: 'Database error' });
+        db.get("SELECT AVG(score) as avg FROM quiz_attempts", (err, result) => {
+          if (err) return res.status(500).json({ error: "Database error" });
           stats.averageScore = Math.round(result.avg || 0);
 
           res.json(stats);
@@ -388,34 +446,141 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, (req, res) => {
   });
 });
 
-app.get('/api/admin/recent-attempts', authenticateToken, requireAdmin, (req, res) => {
-  db.all(`SELECT qa.*, u.username, q.title as quiz_title
+app.get("/api/admin/analytics", authenticateToken, requireAdmin, (req, res) => {
+  const analytics = {
+    scoreDistribution: [],
+    quizPerformance: [],
+    gradeDistribution: [],
+  };
+
+  // Score Distribution
+  db.all(
+    `SELECT 
+    CASE 
+      WHEN (score * 100.0 / total_questions) < 40 THEN '0-40%'
+      WHEN (score * 100.0 / total_questions) < 60 THEN '41-60%'
+      WHEN (score * 100.0 / total_questions) < 80 THEN '61-80%'
+      ELSE '81-100%'
+    END as range,
+    COUNT(*) as count
+    FROM quiz_attempts 
+    GROUP BY range
+    ORDER BY range`,
+    (err, scoreDistribution) => {
+      if (err) return res.status(500).json({ error: "Database error" });
+
+      analytics.scoreDistribution = scoreDistribution || [];
+
+      // Quiz Performance
+      db.all(
+        `SELECT 
+      q.title as quiz,
+      AVG(qa.score * 100.0 / qa.total_questions) as avgScore,
+      COUNT(qa.id) as attempts
+      FROM quizzes q
+      LEFT JOIN quiz_attempts qa ON q.id = qa.quiz_id
+      GROUP BY q.id, q.title
+      HAVING COUNT(qa.id) > 0
+      ORDER BY avgScore DESC`,
+        (err, quizPerformance) => {
+          if (err) return res.status(500).json({ error: "Database error" });
+
+          analytics.quizPerformance = (quizPerformance || []).map((item) => ({
+            ...item,
+            avgScore: Math.round(item.avgScore || 0),
+          }));
+
+          // Grade Distribution
+          db.all(
+            `SELECT 
+        CASE 
+          WHEN (score * 100.0 / total_questions) >= 90 THEN 'A+'
+          WHEN (score * 100.0 / total_questions) >= 80 THEN 'A'
+          WHEN (score * 100.0 / total_questions) >= 70 THEN 'B'
+          WHEN (score * 100.0 / total_questions) >= 60 THEN 'C'
+          WHEN (score * 100.0 / total_questions) >= 50 THEN 'D'
+          ELSE 'F'
+        END as grade,
+        COUNT(*) as count
+        FROM quiz_attempts 
+        GROUP BY grade
+        ORDER BY 
+          CASE grade
+            WHEN 'A+' THEN 1
+            WHEN 'A' THEN 2
+            WHEN 'B' THEN 3
+            WHEN 'C' THEN 4
+            WHEN 'D' THEN 5
+            WHEN 'F' THEN 6
+          END`,
+            (err, gradeDistribution) => {
+              if (err) return res.status(500).json({ error: "Database error" });
+
+              const gradeColors = {
+                "A+": "rgba(16, 185, 129, 0.8)",
+                A: "rgba(34, 197, 94, 0.8)",
+                B: "rgba(59, 130, 246, 0.8)",
+                C: "rgba(245, 158, 11, 0.8)",
+                D: "rgba(249, 115, 22, 0.8)",
+                F: "rgba(239, 68, 68, 0.8)",
+              };
+
+              analytics.gradeDistribution = (gradeDistribution || []).map(
+                (item) => ({
+                  ...item,
+                  color: gradeColors[item.grade] || "rgba(156, 163, 175, 0.8)",
+                })
+              );
+
+              res.json(analytics);
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+app.get(
+  "/api/admin/recent-attempts",
+  authenticateToken,
+  requireAdmin,
+  (req, res) => {
+    db.all(
+      `SELECT qa.*, u.username, q.title as quiz_title
           FROM quiz_attempts qa
           JOIN users u ON qa.user_id = u.id
           JOIN quizzes q ON qa.quiz_id = q.id
           ORDER BY qa.completed_at DESC
-          LIMIT 10`, (err, attempts) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
-    res.json(attempts);
-  });
-});
+          LIMIT 10`,
+      (err, attempts) => {
+        if (err) {
+          return res.status(500).json({ error: "Database error" });
+        }
+        res.json(attempts);
+      }
+    );
+  }
+);
 
 // User routes
-app.get('/api/user/attempts', authenticateToken, (req, res) => {
+app.get("/api/user/attempts", authenticateToken, (req, res) => {
   const userId = req.user.id;
-  
-  db.all(`SELECT qa.*, q.title as quiz_title
+
+  db.all(
+    `SELECT qa.*, q.title as quiz_title
           FROM quiz_attempts qa
           JOIN quizzes q ON qa.quiz_id = q.id
           WHERE qa.user_id = ?
-          ORDER BY qa.completed_at DESC`, [userId], (err, attempts) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
+          ORDER BY qa.completed_at DESC`,
+    [userId],
+    (err, attempts) => {
+      if (err) {
+        return res.status(500).json({ error: "Database error" });
+      }
+      res.json(attempts);
     }
-    res.json(attempts);
-  });
+  );
 });
 
 app.listen(PORT, () => {
