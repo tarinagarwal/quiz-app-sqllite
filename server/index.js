@@ -375,6 +375,149 @@ app.post("/api/quizzes/:id/submit", authenticateToken, (req, res) => {
   );
 });
 
+// Job management routes
+app.get("/api/admin/jobs", authenticateToken, requireAdmin, (req, res) => {
+  db.all(
+    `SELECT * FROM job_logs ORDER BY executed_at DESC LIMIT 100`,
+    (err, logs) => {
+      if (err) {
+        return res.status(500).json({ error: "Database error" });
+      }
+      res.json(logs);
+    }
+  );
+});
+
+app.post(
+  "/api/admin/jobs/:jobName/run",
+  authenticateToken,
+  requireAdmin,
+  async (req, res) => {
+    const { jobName } = req.params;
+
+    try {
+      await runJob(jobName);
+      res.json({ message: `Job ${jobName} executed successfully` });
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+);
+
+// Metrics routes
+app.get("/api/admin/metrics", authenticateToken, requireAdmin, (req, res) => {
+  const days = parseInt(req.query.days) || 30;
+
+  db.all(
+    `SELECT * FROM system_metrics 
+          WHERE metric_date >= date('now', '-${days} days') 
+          ORDER BY metric_date DESC`,
+    (err, metrics) => {
+      if (err) {
+        return res.status(500).json({ error: "Database error" });
+      }
+      res.json(metrics);
+    }
+  );
+});
+
+app.get(
+  "/api/admin/metrics/summary",
+  authenticateToken,
+  requireAdmin,
+  (req, res) => {
+    const summaryQueries = [
+      'SELECT COUNT(*) as totalUsers FROM users WHERE role = "user"',
+      "SELECT COUNT(*) as totalQuizzes FROM quizzes",
+      "SELECT COUNT(*) as totalAttempts FROM quiz_attempts",
+      "SELECT AVG(score * 100.0 / total_questions) as averageScore FROM quiz_attempts",
+      'SELECT COUNT(*) as todayAttempts FROM quiz_attempts WHERE DATE(completed_at) = DATE("now")',
+      'SELECT COUNT(*) as weeklyUsers FROM users WHERE role = "user" AND created_at >= datetime("now", "-7 days")',
+      'SELECT COUNT(*) as weeklyAttempts FROM quiz_attempts WHERE completed_at >= datetime("now", "-7 days")',
+    ];
+
+    Promise.all(
+      summaryQueries.map(
+        (query) =>
+          new Promise((resolve, reject) => {
+            db.get(query, (err, result) => {
+              if (err) reject(err);
+              else resolve(result);
+            });
+          })
+      )
+    )
+      .then((results) => {
+        const [
+          users,
+          quizzes,
+          attempts,
+          avgScore,
+          todayAttempts,
+          weeklyUsers,
+          weeklyAttempts,
+        ] = results;
+
+        res.json({
+          totalUsers: users.totalUsers || 0,
+          totalQuizzes: quizzes.totalQuizzes || 0,
+          totalAttempts: attempts.totalAttempts || 0,
+          averageScore: Math.round(avgScore.averageScore || 0),
+          todayAttempts: todayAttempts.todayAttempts || 0,
+          weeklyGrowth: {
+            users: weeklyUsers.weeklyUsers || 0,
+            attempts: weeklyAttempts.weeklyAttempts || 0,
+          },
+        });
+      })
+      .catch((err) => {
+        res.status(500).json({ error: "Database error" });
+      });
+  }
+);
+
+// User preferences routes
+app.get("/api/user/preferences", authenticateToken, (req, res) => {
+  const userId = req.user.id;
+
+  db.get(
+    `SELECT * FROM user_preferences WHERE user_id = ?`,
+    [userId],
+    (err, preferences) => {
+      if (err) {
+        return res.status(500).json({ error: "Database error" });
+      }
+
+      // Return default preferences if none exist
+      const defaultPreferences = {
+        email_reminders: true,
+        reminder_time: "09:00",
+        weekly_reports: true,
+      };
+
+      res.json(preferences || defaultPreferences);
+    }
+  );
+});
+
+app.put("/api/user/preferences", authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  const { email_reminders, reminder_time, weekly_reports } = req.body;
+
+  db.run(
+    `INSERT OR REPLACE INTO user_preferences 
+          (user_id, email_reminders, reminder_time, weekly_reports) 
+          VALUES (?, ?, ?, ?)`,
+    [userId, email_reminders, reminder_time, weekly_reports],
+    function (err) {
+      if (err) {
+        return res.status(500).json({ error: "Database error" });
+      }
+      res.json({ message: "Preferences updated successfully" });
+    }
+  );
+});
+
 // Admin routes
 app.post("/api/admin/quizzes", authenticateToken, requireAdmin, (req, res) => {
   const { title, description, category, difficulty, timeLimit, questions } =
@@ -792,77 +935,6 @@ app.get(
     );
   }
 );
-
-// Job management routes
-app.get("/api/admin/jobs", authenticateToken, requireAdmin, (req, res) => {
-  db.all(
-    `SELECT * FROM job_logs ORDER BY executed_at DESC LIMIT 50`,
-    (err, logs) => {
-      if (err) {
-        return res.status(500).json({ error: "Database error" });
-      }
-      res.json(logs);
-    }
-  );
-});
-
-app.post(
-  "/api/admin/jobs/:jobName/run",
-  authenticateToken,
-  requireAdmin,
-  async (req, res) => {
-    const { jobName } = req.params;
-
-    try {
-      await runJob(jobName);
-      res.json({ message: `Job ${jobName} executed successfully` });
-    } catch (error) {
-      res.status(400).json({ error: error.message });
-    }
-  }
-);
-
-// User preferences routes
-app.get("/api/user/preferences", authenticateToken, (req, res) => {
-  const userId = req.user.id;
-
-  db.get(
-    `SELECT * FROM user_preferences WHERE user_id = ?`,
-    [userId],
-    (err, preferences) => {
-      if (err) {
-        return res.status(500).json({ error: "Database error" });
-      }
-
-      // Return default preferences if none exist
-      const defaultPreferences = {
-        email_reminders: true,
-        reminder_time: "09:00",
-        weekly_reports: true,
-      };
-
-      res.json(preferences || defaultPreferences);
-    }
-  );
-});
-
-app.put("/api/user/preferences", authenticateToken, (req, res) => {
-  const userId = req.user.id;
-  const { email_reminders, reminder_time, weekly_reports } = req.body;
-
-  db.run(
-    `INSERT OR REPLACE INTO user_preferences 
-          (user_id, email_reminders, reminder_time, weekly_reports) 
-          VALUES (?, ?, ?, ?)`,
-    [userId, email_reminders, reminder_time, weekly_reports],
-    function (err) {
-      if (err) {
-        return res.status(500).json({ error: "Database error" });
-      }
-      res.json({ message: "Preferences updated successfully" });
-    }
-  );
-});
 
 // User routes
 app.get("/api/user/attempts", authenticateToken, (req, res) => {

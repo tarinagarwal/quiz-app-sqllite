@@ -9,6 +9,8 @@ import {
   Trophy,
   BarChart3,
   Search,
+  Activity,
+  Database,
 } from "lucide-react";
 
 const Navbar = () => {
@@ -81,6 +83,30 @@ const Navbar = () => {
                 >
                   <Search className="h-4 w-4" />
                   <span>Attempts</span>
+                </Link>
+
+                <Link
+                  to="/admin/logs"
+                  className={`flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors ${
+                    isActive("/admin/logs")
+                      ? "bg-purple-100 text-purple-700"
+                      : "text-gray-600 hover:text-purple-600 hover:bg-purple-50"
+                  }`}
+                >
+                  <Activity className="h-4 w-4" />
+                  <span>Logs</span>
+                </Link>
+
+                <Link
+                  to="/admin/metrics"
+                  className={`flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors ${
+                    isActive("/admin/metrics")
+                      ? "bg-purple-100 text-purple-700"
+                      : "text-gray-600 hover:text-purple-600 hover:bg-purple-50"
+                  }`}
+                >
+                  <Database className="h-4 w-4" />
+                  <span>Metrics</span>
                 </Link>
               </>
             )}

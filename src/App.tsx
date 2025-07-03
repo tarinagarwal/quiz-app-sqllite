@@ -14,6 +14,8 @@ import Dashboard from "./pages/Dashboard";
 import Quiz from "./pages/Quiz";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminAttempts from "./pages/AdminAttempts";
+import AdminLogs from "./pages/AdminLogs";
+import AdminMetrics from "./pages/AdminMetrics";
 import CreateQuiz from "./pages/CreateQuiz";
 import Results from "./pages/Results";
 import UserHistory from "./pages/UserHistory";
@@ -93,6 +95,22 @@ function AppContent() {
             element={
               <AdminRoute>
                 <AdminAttempts />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/logs"
+            element={
+              <AdminRoute>
+                <AdminLogs />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/metrics"
+            element={
+              <AdminRoute>
+                <AdminMetrics />
               </AdminRoute>
             }
           />
